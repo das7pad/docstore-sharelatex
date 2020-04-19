@@ -70,7 +70,7 @@ describe('Deleting a doc', function () {
     })
   })
 
-  return describe('when the doc does not exist', function () {
+  describe('when the doc does not exist', function () {
     return it('should return a 404', function (done) {
       const missing_doc_id = ObjectId()
       return DocstoreClient.deleteDoc(
@@ -83,77 +83,69 @@ describe('Deleting a doc', function () {
       )
     })
   })
-})
 
-describe("Destroying a project's documents", function () {
-  describe('when the doc exists', function () {
-    beforeEach(function (done) {
-      return db.docOps.insert(
-        { doc_id: ObjectId(this.doc_id), version: 1 },
-        function (err) {
+  describe("Destroying a project's documents", function () {
+    describe('when the doc exists', function () {
+      beforeEach(function (done) {
+        DocstoreClient.destroyAllDoc(this.project_id, done)
+      })
+
+      it('should remove the doc from the docs collection', function (done) {
+        return db.docs.find({ _id: this.doc_id }, (err, docs) => {
+          expect(err).not.to.exist
+          expect(docs).to.deep.equal([])
+          return done()
+        })
+      })
+
+      return it('should remove the docOps from the docOps collection', function (done) {
+        return db.docOps.find({ doc_id: this.doc_id }, (err, docOps) => {
+          expect(err).not.to.exist
+          expect(docOps).to.deep.equal([])
+          return done()
+        })
+      })
+    })
+
+    return describe('when the doc is archived', function () {
+      beforeEach(function (done) {
+        return DocstoreClient.archiveAllDoc(this.project_id, (err) => {
           if (err != null) {
             return done(err)
           }
           return DocstoreClient.destroyAllDoc(this.project_id, done)
-        }
-      )
-    })
-
-    it('should remove the doc from the docs collection', function (done) {
-      return db.docs.find({ _id: this.doc_id }, (err, docs) => {
-        expect(err).not.to.exist
-        expect(docs).to.deep.equal([])
-        return done()
+        })
       })
-    })
 
-    return it('should remove the docOps from the docOps collection', function (done) {
-      return db.docOps.find({ doc_id: this.doc_id }, (err, docOps) => {
-        expect(err).not.to.exist
-        expect(docOps).to.deep.equal([])
-        return done()
-      })
-    })
-  })
-
-  return describe('when the doc is archived', function () {
-    beforeEach(function (done) {
-      return DocstoreClient.archiveAllDoc(this.project_id, function (err) {
-        if (err != null) {
-          return done(err)
-        }
-        return DocstoreClient.destroyAllDoc(this.project_id, done)
-      })
-    })
-
-    it('should remove the doc from the docs collection', function (done) {
-      return db.docs.find({ _id: this.doc_id }, (err, docs) => {
-        expect(err).not.to.exist
-        expect(docs).to.deep.equal([])
-        return done()
-      })
-    })
-
-    it('should remove the docOps from the docOps collection', function (done) {
-      return db.docOps.find({ doc_id: this.doc_id }, (err, docOps) => {
-        expect(err).not.to.exist
-        expect(docOps).to.deep.equal([])
-        return done()
-      })
-    })
-
-    return it('should remove the doc contents from s3', function (done) {
-      return DocstoreClient.getS3Doc(
-        this.project_id,
-        this.doc_id,
-        (error, res, s3_doc) => {
-          if (error != null) {
-            throw error
-          }
-          expect(res.statusCode).to.equal(404)
+      it('should remove the doc from the docs collection', function (done) {
+        return db.docs.find({ _id: this.doc_id }, (err, docs) => {
+          expect(err).not.to.exist
+          expect(docs).to.deep.equal([])
           return done()
-        }
-      )
+        })
+      })
+
+      it('should remove the docOps from the docOps collection', function (done) {
+        return db.docOps.find({ doc_id: this.doc_id }, (err, docOps) => {
+          expect(err).not.to.exist
+          expect(docOps).to.deep.equal([])
+          return done()
+        })
+      })
+
+      return it('should remove the doc contents from s3', function (done) {
+        return DocstoreClient.getS3Doc(
+          this.project_id,
+          this.doc_id,
+          (error, res, s3_doc) => {
+            if (error != null) {
+              throw error
+            }
+            expect(res.statusCode).to.equal(404)
+            return done()
+          }
+        )
+      })
     })
   })
 })
