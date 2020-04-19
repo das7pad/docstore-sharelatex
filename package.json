@@ -23,10 +23,10 @@
     "aws-sdk": "^2.658.0",
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
-    "logger-sharelatex": "^1.9.0",
-    "metrics-sharelatex": "^2.6.2",
-    "mongojs": "3.1.0",
-    "settings-sharelatex": "^1.1.0",
+    "logger-sharelatex": "git+https://github.com/das7pad/logger-sharelatex.git#bef2078daae2433a43e61db306e301398199daa0",
+    "metrics-sharelatex": "git+https://github.com/das7pad/metrics-sharelatex.git#3aa1de4fba521fc0e7969e619dec8f169f0d889f",
+    "mongojs": "git+https://github.com/das7pad/mongojs.git#e39e97bf289435e2d111c6201d3306b6b776d31e",
+    "settings-sharelatex": "git+https://github.com/das7pad/settings-sharelatex.git#d0797834438df2d102798a64602adf2f71ac8e48",
     "underscore": "~1.9.2"
   },
   "devDependencies": {
