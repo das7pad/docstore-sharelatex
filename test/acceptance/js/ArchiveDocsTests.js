@@ -12,7 +12,6 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-const sinon = require('sinon')
 const chai = require('chai')
 const should = chai.should()
 const { db, ObjectId, ISODate } = require('../../../app/js/mongojs')
