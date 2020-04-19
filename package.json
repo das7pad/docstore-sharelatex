@@ -15,8 +15,8 @@
     "test:unit": "npm run test:unit:_run -- --grep=$MOCHA_GREP",
     "nodemon": "nodemon --config nodemon.json",
     "lint": "node_modules/.bin/eslint .",
-    "format": "node_modules/.bin/prettier-eslint '**/*.js' --list-different",
-    "format:fix": "node_modules/.bin/prettier-eslint '**/*.js' --write"
+    "format": "node_modules/.bin/prettier-eslint $PWD/'**/*.js' --list-different",
+    "format:fix": "node_modules/.bin/prettier-eslint $PWD/'**/*.js' --write"
   },
   "dependencies": {
     "async": "^2.6.3",
