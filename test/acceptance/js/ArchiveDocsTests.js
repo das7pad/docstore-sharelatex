@@ -17,9 +17,6 @@ const chai = require('chai')
 const should = chai.should()
 const { db, ObjectId, ISODate } = require('../../../app/js/mongojs')
 const async = require('async')
-const Settings = require('settings-sharelatex')
-const DocArchiveManager = require('../../../app/js/DocArchiveManager.js')
-const request = require('request')
 const DocstoreApp = require('./helpers/DocstoreApp')
 const DocstoreClient = require('./helpers/DocstoreClient')
 
@@ -1054,15 +1051,11 @@ describe('Archiving', function () {
         ranges: {},
         version: 2
       }
-      const options = DocArchiveManager.buildS3Options(
-        `${this.project_id}/${this.doc._id}`
-      )
-      options.json = this.doc.lines
-      return request.put(options, (error, res, body) => {
+      const key = `${this.project_id}/${this.doc._id}`
+      DocstoreClient.putS3DocOld(key, this.doc.lines, (error) => {
         if (error != null) {
           throw error
         }
-        res.statusCode.should.equal(200)
         return db.docs.insert(
           {
             project_id: this.project_id,

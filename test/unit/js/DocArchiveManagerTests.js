@@ -34,11 +34,13 @@ describe('DocArchiveManager', function () {
         }
       }
     }
-
-    this.request = {
-      put: {},
-      get: {},
-      del: {}
+    this.s3 = {
+      putObject: sinon.stub().callsArgWith(1, null, {}),
+      getObject: sinon.stub().callsArgWith(1, null, {
+        Body: Buffer.alloc(0)
+      }),
+      headObject: sinon.stub().callsArgWith(1, null, {}),
+      deleteObject: sinon.stub().callsArgWith(1, null, {})
     }
 
     this.archivedDocs = [
@@ -117,14 +119,16 @@ describe('DocArchiveManager', function () {
     this.requires = {
       'settings-sharelatex': this.settings,
       './MongoManager': this.MongoManager,
-      request: this.request,
+      'aws-sdk': {
+        S3: sinon.stub().returns(this.s3)
+      },
       './RangeManager': (this.RangeManager = {}),
       'logger-sharelatex': {
         log() {},
         err() {}
       }
     }
-    this.globals = { JSON }
+    this.globals = { JSON, Buffer }
 
     this.error = 'my errror'
     this.project_id = ObjectId().toString()
@@ -137,30 +141,23 @@ describe('DocArchiveManager', function () {
 
   describe('archiveDoc', function () {
     it('should use correct options', function (done) {
-      this.request.put = sinon
-        .stub()
-        .callsArgWith(1, null, { statusCode: 200, headers: { etag: '' } })
+      this.s3.putObject.callsArgWith(1, null, {})
+      const blob = JSON.stringify({
+        lines: this.mongoDocs[0].lines,
+        ranges: this.mongoDocs[0].ranges,
+        schema_v: 1
+      })
       return this.DocArchiveManager.archiveDoc(
         this.project_id,
         this.mongoDocs[0],
         (err) => {
-          const opts = this.request.put.args[0][0]
-          assert.deepEqual(opts.aws, {
-            key: this.settings.docstore.s3.key,
-            secret: this.settings.docstore.s3.secret,
-            bucket: this.settings.docstore.s3.bucket
+          const opts = this.s3.putObject.args[0][0]
+          assert.deepEqual(opts, {
+            Bucket: this.settings.docstore.s3.bucket,
+            Key: `${this.project_id}/${this.mongoDocs[0]._id}`,
+            Body: blob,
+            ContentMD5: crypto.createHash('md5').update(blob).digest('base64')
           })
-          opts.body.should.equal(
-            JSON.stringify({
-              lines: this.mongoDocs[0].lines,
-              ranges: this.mongoDocs[0].ranges,
-              schema_v: 1
-            })
-          )
-          opts.timeout.should.equal(30 * 1000)
-          opts.uri.should.equal(
-            `https://${this.settings.docstore.s3.bucket}.s3.amazonaws.com/${this.project_id}/${this.mongoDocs[0]._id}`
-          )
           return done()
         }
       )
@@ -173,9 +170,9 @@ describe('DocArchiveManager', function () {
         schema_v: 1
       })
       this.md5 = crypto.createHash('md5').update(data).digest('hex')
-      this.request.put = sinon
-        .stub()
-        .callsArgWith(1, null, { statusCode: 200, headers: { etag: this.md5 } })
+      this.s3.putObject.callsArgWith(1, null, {
+        ETag: this.md5
+      })
       return this.DocArchiveManager.archiveDoc(
         this.project_id,
         this.mongoDocs[0],
@@ -187,10 +184,7 @@ describe('DocArchiveManager', function () {
     })
 
     return it('should return the error', function (done) {
-      this.request.put = sinon.stub().callsArgWith(1, this.stubbedError, {
-        statusCode: 400,
-        headers: { etag: '' }
-      })
+      this.s3.putObject.callsArgWith(1, this.stubbedError)
       return this.DocArchiveManager.archiveDoc(
         this.project_id,
         this.mongoDocs[0],
@@ -204,34 +198,26 @@ describe('DocArchiveManager', function () {
 
   describe('unarchiveDoc', function () {
     it('should use correct options', function (done) {
-      this.request.get = sinon
-        .stub()
-        .callsArgWith(1, null, { statusCode: 200 }, this.mongoDocs[0].lines)
-      this.request.del = sinon
-        .stub()
-        .callsArgWith(1, null, { statusCode: 204 }, {})
+      this.s3.getObject.callsArgWith(1, null, {
+        Body: Buffer.from(JSON.stringify(this.mongoDocs[0].lines))
+      })
+      this.s3.deleteObject.callsArgWith(1, null, {})
       return this.DocArchiveManager.unarchiveDoc(
         this.project_id,
         this.mongoDocs[0]._id,
         (err) => {
-          const opts = this.request.get.args[0][0]
-          assert.deepEqual(opts.aws, {
-            key: this.settings.docstore.s3.key,
-            secret: this.settings.docstore.s3.secret,
-            bucket: this.settings.docstore.s3.bucket
+          const opts = this.s3.getObject.args[0][0]
+          assert.deepEqual(opts, {
+            Bucket: this.settings.docstore.s3.bucket,
+            Key: `${this.project_id}/${this.mongoDocs[0]._id}`
           })
-          opts.json.should.equal(true)
-          opts.timeout.should.equal(30 * 1000)
-          opts.uri.should.equal(
-            `https://${this.settings.docstore.s3.bucket}.s3.amazonaws.com/${this.project_id}/${this.mongoDocs[0]._id}`
-          )
           return done()
         }
       )
     })
 
     it('should return the error', function (done) {
-      this.request.get = sinon.stub().callsArgWith(1, this.stubbedError, {}, {})
+      this.s3.getObject.callsArgWith(1, this.stubbedError, {}, {})
       return this.DocArchiveManager.unarchiveDoc(
         this.project_id,
         this.mongoDocs[0],
@@ -243,16 +229,16 @@ describe('DocArchiveManager', function () {
     })
 
     return it('should error if the doc lines are a string not an array', function (done) {
-      this.request.get = sinon
-        .stub()
-        .callsArgWith(1, null, { statusCode: 200 }, 'this is a string')
-      this.request.del = sinon.stub()
+      this.s3.getObject.callsArgWith(1, null, {
+        Body: Buffer.from('this is a string')
+      })
+      this.s3.deleteObject = sinon.stub()
       return this.DocArchiveManager.unarchiveDoc(
         this.project_id,
         this.mongoDocs[0],
         (err) => {
           should.exist(err)
-          this.request.del.called.should.equal(false)
+          this.s3.deleteObject.called.should.equal(false)
           return done()
         }
       )
@@ -376,9 +362,14 @@ describe('DocArchiveManager', function () {
 
   describe('destroyAllDocs', function () {
     beforeEach(function () {
-      this.request.del = sinon
-        .stub()
-        .callsArgWith(1, null, { statusCode: 204 }, {})
+      this.s3.deleteObject.callsArgWith(
+        1,
+        null,
+        {
+          statusCode: 204
+        },
+        {}
+      )
       this.MongoManager.getProjectsDocs = sinon
         .stub()
         .callsArgWith(3, null, this.mixedDocs)
@@ -408,14 +399,8 @@ describe('DocArchiveManager', function () {
       const docOpts = (doc) => {
         return JSON.parse(
           JSON.stringify({
-            aws: {
-              key: this.settings.docstore.s3.key,
-              secret: this.settings.docstore.s3.secret,
-              bucket: this.settings.docstore.s3.bucket
-            },
-            json: true,
-            timeout: 30 * 1000,
-            uri: `https://${this.settings.docstore.s3.bucket}.s3.amazonaws.com/${this.project_id}/${doc._id}`
+            Bucket: this.settings.docstore.s3.bucket,
+            Key: `${this.project_id}/${doc._id}`
           })
         )
       }
@@ -425,10 +410,10 @@ describe('DocArchiveManager', function () {
         expect(err).not.to.exist
 
         for (doc of Array.from(this.archivedDocs)) {
-          sinon.assert.calledWith(this.request.del, docOpts(doc))
+          sinon.assert.calledWith(this.s3.deleteObject, docOpts(doc))
         }
         for (doc of Array.from(this.unarchivedDocs)) {
-          expect(this.request.del.calledWith(docOpts(doc))).to.equal(false)
+          expect(this.s3.deleteObject.calledWith(docOpts(doc))).to.equal(false)
         } // no notCalledWith
 
         return done()
@@ -452,7 +437,7 @@ describe('DocArchiveManager', function () {
     describe('with the old schema', function () {
       return it('should return the docs lines', function (done) {
         return this.DocArchiveManager._s3DocToMongoDoc(
-          ['doc', 'lines'],
+          Buffer.from('["doc", "lines"]'),
           (error, doc) => {
             expect(doc).to.deep.equal({
               lines: ['doc', 'lines']
@@ -469,11 +454,15 @@ describe('DocArchiveManager', function () {
           .stub()
           .returns({ mongo: 'ranges' })
         return this.DocArchiveManager._s3DocToMongoDoc(
-          {
-            lines: ['doc', 'lines'],
-            ranges: { json: 'ranges' },
-            schema_v: 1
-          },
+          Buffer.from(
+            JSON.stringify({
+              lines: ['doc', 'lines'],
+              ranges: {
+                json: 'ranges'
+              },
+              schema_v: 1
+            })
+          ),
           (error, doc) => {
             expect(doc).to.deep.equal({
               lines: ['doc', 'lines'],
@@ -486,10 +475,12 @@ describe('DocArchiveManager', function () {
 
       return it('should return just the doc lines when there are no ranges', function (done) {
         return this.DocArchiveManager._s3DocToMongoDoc(
-          {
-            lines: ['doc', 'lines'],
-            schema_v: 1
-          },
+          Buffer.from(
+            JSON.stringify({
+              lines: ['doc', 'lines'],
+              schema_v: 1
+            })
+          ),
           (error, doc) => {
             expect(doc).to.deep.equal({
               lines: ['doc', 'lines']

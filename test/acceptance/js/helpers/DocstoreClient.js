@@ -13,9 +13,16 @@
  */
 let DocstoreClient
 const request = require('request').defaults({ jar: false })
-const { db, ObjectId } = require('../../../../app/js/mongojs')
 const settings = require('settings-sharelatex')
-const DocArchiveManager = require('../../../../app/js/DocArchiveManager.js')
+
+const AWS = require('aws-sdk')
+const s3 = new AWS.S3({
+  accessKeyId: settings.docstore.s3.key,
+  secretAccessKey: settings.docstore.s3.secret,
+  endpoint: settings.docstore.s3.endpoint,
+  s3ForcePathStyle: settings.docstore.s3.forcePathStyle,
+  signatureVersion: 'v4'
+})
 
 module.exports = DocstoreClient = {
   createDoc(project_id, doc_id, lines, version, ranges, callback) {
@@ -129,8 +136,27 @@ module.exports = DocstoreClient = {
     if (callback == null) {
       callback = function (error, res, body) {}
     }
-    const options = DocArchiveManager.buildS3Options(project_id + '/' + doc_id)
-    options.json = true
-    return request.get(options, callback)
+    const options = {
+      Bucket: settings.docstore.s3.bucket,
+      Key: project_id + '/' + doc_id
+    }
+    s3.getObject(options, (err, response) => {
+      if (err) {
+        return callback(err)
+      }
+      return callback(err, response, JSON.parse(response.Body.toString()))
+    })
+  },
+
+  putS3DocOld: function (key, lines, callback) {
+    if (callback == null) {
+      callback = function (error, res) {}
+    }
+    const options = {
+      Bucket: settings.docstore.s3.bucket,
+      Key: key,
+      Body: JSON.stringify(lines)
+    }
+    s3.putObject(options, callback)
   }
 }

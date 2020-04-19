@@ -19,6 +19,13 @@ const Settings = {
   docstore: {
     healthCheck: {
       project_id: process.env.HEALTH_CHECK_PROJECT_ID
+    },
+    s3: {
+      key: process.env.AWS_ACCESS_KEY_ID,
+      secret: process.env.AWS_SECRET_ACCESS_KEY,
+      bucket: process.env.AWS_BUCKET,
+      endpoint: process.env.AWS_S3_ENDPOINT,
+      forcePathStyle: process.env.AWS_S3_PATH_STYLE === 'true'
     }
   },
 
@@ -31,18 +38,6 @@ if (process.env.MONGO_CONNECTION_STRING != null) {
   Settings.mongo.url = `mongodb://${process.env.MONGO_HOST}/sharelatex`
 } else {
   Settings.mongo.url = 'mongodb://127.0.0.1/sharelatex'
-}
-
-if (
-  process.env.AWS_ACCESS_KEY_ID != null &&
-  process.env.AWS_SECRET_ACCESS_KEY != null &&
-  process.env.AWS_BUCKET != null
-) {
-  Settings.docstore.s3 = {
-    key: process.env.AWS_ACCESS_KEY_ID,
-    secret: process.env.AWS_SECRET_ACCESS_KEY,
-    bucket: process.env.AWS_BUCKET
-  }
 }
 
 module.exports = Settings

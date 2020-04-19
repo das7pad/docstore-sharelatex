@@ -18,10 +18,49 @@ const logger = require('logger-sharelatex')
 const _ = require('underscore')
 const async = require('async')
 const settings = require('settings-sharelatex')
-const request = require('request')
 const crypto = require('crypto')
 const RangeManager = require('./RangeManager')
-const thirtySeconds = 30 * 1000
+
+const AWS = require('aws-sdk')
+const s3 = new AWS.S3({
+  accessKeyId: settings.docstore.s3.key,
+  secretAccessKey: settings.docstore.s3.secret,
+  endpoint: settings.docstore.s3.endpoint,
+  s3ForcePathStyle: settings.docstore.s3.forcePathStyle,
+  signatureVersion: 'v4'
+})
+
+function calculateMD5(blob) {
+  return crypto.createHash('md5').update(blob, 'utf8').digest('hex')
+}
+
+function getMD5fromResponse(response) {
+  const md5fromETag = (response.ETag || '').replace(/[ "]/g, '')
+  if (md5fromETag.match(/^[a-f0-9]{32}$/)) {
+    return md5fromETag
+  }
+  return null
+}
+
+function getMD5fromResponseOrCalculate(response, key, callback) {
+  if (callback == null) {
+    callback = function (error, md5) {}
+  }
+  const md5fromETag = getMD5fromResponse(response)
+  if (md5fromETag) {
+    return callback(null, md5fromETag)
+  }
+  const options = {
+    Bucket: settings.docstore.s3.bucket,
+    Key: key
+  }
+  s3.headObject(options, function (error, response) {
+    if (error) {
+      return callback(error)
+    }
+    callback(null, getMD5fromResponse(response))
+  })
+}
 
 module.exports = DocArchive = {
   archiveAllDocs(project_id, callback) {
@@ -50,55 +89,61 @@ module.exports = DocArchive = {
   },
 
   archiveDoc(project_id, doc, callback) {
-    let options
     logger.log({ project_id, doc_id: doc._id }, 'sending doc to s3')
-    try {
-      options = DocArchive.buildS3Options(project_id + '/' + doc._id)
-    } catch (e) {
-      return callback(e)
-    }
-    return DocArchive._mongoDocToS3Doc(doc, function (error, json_doc) {
-      if (error != null) {
+    DocArchive._mongoDocToS3Doc(doc, function (error, json_doc) {
+      if (error) {
         return callback(error)
       }
-      options.body = json_doc
-      options.headers = { 'Content-Type': 'application/json' }
-      return request.put(options, function (err, res) {
-        if (err != null || res.statusCode !== 200) {
+      const key = project_id + '/' + doc._id
+      const md5lines = calculateMD5(json_doc)
+      const options = {
+        Bucket: settings.docstore.s3.bucket,
+        Key: key,
+        Body: json_doc,
+        ContentMD5: Buffer.from(md5lines, 'hex').toString('base64')
+      }
+      s3.putObject(options, function (err, response) {
+        if (err) {
           logger.err(
             {
               err,
-              res,
               project_id,
-              doc_id: doc._id,
-              statusCode: res != null ? res.statusCode : undefined
+              doc_id: doc._id
             },
             'something went wrong archiving doc in aws'
           )
           return callback(new Error('Error in S3 request'))
         }
-        const md5lines = crypto
-          .createHash('md5')
-          .update(json_doc, 'utf8')
-          .digest('hex')
-        const md5response = res.headers.etag.toString().replace(/\"/g, '')
-        if (md5lines !== md5response) {
-          logger.err(
-            {
-              responseMD5: md5response,
-              linesMD5: md5lines,
-              project_id,
-              doc_id: doc != null ? doc._id : undefined
-            },
-            'err in response md5 from s3'
-          )
-          return callback(new Error('Error in S3 md5 response'))
-        }
-        return MongoManager.markDocAsArchived(doc._id, doc.rev, function (err) {
+        getMD5fromResponseOrCalculate(response, key, (err, md5response) => {
           if (err != null) {
-            return callback(err)
+            logger.err(
+              {
+                err: err,
+                project_id: project_id,
+                doc_id: doc._id
+              },
+              'failed to fetch doc from s3 for content validation'
+            )
+            return callback(new Error('Error in S3 response for validation'))
           }
-          return callback()
+          if (md5lines !== md5response) {
+            logger.err(
+              {
+                responseMD5: md5response,
+                linesMD5: md5lines,
+                project_id,
+                doc_id: doc != null ? doc._id : undefined
+              },
+              'err in response md5 from s3'
+            )
+            return callback(new Error('Error in S3 md5 response'))
+          }
+          MongoManager.markDocAsArchived(doc._id, doc.rev, function (err) {
+            if (err != null) {
+              return callback(err)
+            }
+            return callback()
+          })
         })
       })
     })
@@ -136,23 +181,20 @@ module.exports = DocArchive = {
   },
 
   unarchiveDoc(project_id, doc_id, callback) {
-    let options
     logger.log({ project_id, doc_id }, 'getting doc from s3')
-    try {
-      options = DocArchive.buildS3Options(project_id + '/' + doc_id)
-    } catch (e) {
-      return callback(e)
+    const options = {
+      Bucket: settings.docstore.s3.bucket,
+      Key: project_id + '/' + doc_id
     }
-    options.json = true
-    return request.get(options, function (err, res, doc) {
-      if (err != null || res.statusCode !== 200) {
+    s3.getObject(options, function (err, response) {
+      if (err) {
         logger.err(
-          { err, res, project_id, doc_id },
+          { err, project_id, doc_id },
           'something went wrong unarchiving doc from aws'
         )
         return callback(new Errors.NotFoundError('Error in S3 request'))
       }
-      return DocArchive._s3DocToMongoDoc(doc, function (error, mongo_doc) {
+      DocArchive._s3DocToMongoDoc(response.Body, function (error, mongo_doc) {
         if (error != null) {
           return callback(error)
         }
@@ -221,17 +263,14 @@ module.exports = DocArchive = {
   },
 
   _deleteDocFromS3(project_id, doc_id, callback) {
-    let options
-    try {
-      options = DocArchive.buildS3Options(project_id + '/' + doc_id)
-    } catch (e) {
-      return callback(e)
+    const options = {
+      Bucket: settings.docstore.s3.bucket,
+      Key: project_id + '/' + doc_id
     }
-    options.json = true
-    return request.del(options, function (err, res, body) {
-      if (err != null || res.statusCode !== 204) {
+    s3.deleteObject(options, function (err) {
+      if (err != null) {
         logger.err(
-          { err, res, project_id, doc_id },
+          { err, project_id, doc_id },
           'something went wrong deleting doc from aws'
         )
         return callback(new Error('Error in S3 request'))
@@ -240,9 +279,15 @@ module.exports = DocArchive = {
     })
   },
 
-  _s3DocToMongoDoc(doc, callback) {
+  _s3DocToMongoDoc(buffer, callback) {
     if (callback == null) {
       callback = function (error, mongo_doc) {}
+    }
+    let doc
+    try {
+      doc = JSON.parse(buffer.toString())
+    } catch (error) {
+      return callback(error)
     }
     const mongo_doc = {}
     if (doc.schema_v === 1 && doc.lines != null) {
@@ -276,20 +321,5 @@ module.exports = DocArchive = {
       return callback(error)
     }
     return callback(null, json)
-  },
-
-  buildS3Options(key) {
-    if (settings.docstore.s3 == null) {
-      throw new Error('S3 settings are not configured')
-    }
-    return {
-      aws: {
-        key: settings.docstore.s3.key,
-        secret: settings.docstore.s3.secret,
-        bucket: settings.docstore.s3.bucket
-      },
-      timeout: thirtySeconds,
-      uri: `https://${settings.docstore.s3.bucket}.s3.amazonaws.com/${key}`
-    }
   }
 }

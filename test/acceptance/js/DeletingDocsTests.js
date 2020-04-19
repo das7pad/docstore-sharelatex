@@ -137,11 +137,9 @@ describe('Deleting a doc', function () {
         return DocstoreClient.getS3Doc(
           this.project_id,
           this.doc_id,
-          (error, res, s3_doc) => {
-            if (error != null) {
-              throw error
-            }
-            expect(res.statusCode).to.equal(404)
+          (error) => {
+            if (!error || error.code !== 'NoSuchKey')
+              return done(new Error('doc exists'))
             return done()
           }
         )
