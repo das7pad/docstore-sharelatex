@@ -1,44 +1,62 @@
 # This file was auto-generated, do not edit it directly.
 # Instead run bin/update_build_scripts from
-# https://github.com/sharelatex/sharelatex-dev-environment
-# Version: 1.3.5
+# https://github.com/das7pad/sharelatex-dev-env
 
-version: "2.3"
+version: "3.1"
 
 services:
   test_unit:
-    image: node:10.19.0
+    image: node:12.16.2
     volumes:
       - .:/app
     working_dir: /app
     environment:
       MOCHA_GREP: ${MOCHA_GREP}
-      NODE_ENV: test
     command: npm run test:unit
     user: node
 
   test_acceptance:
-    image: node:10.19.0
+    image: node:12.16.2
     volumes:
       - .:/app
     working_dir: /app
     environment:
-      ELASTIC_SEARCH_DSN: es:9200
-      REDIS_HOST: redis
+      LOG_LEVEL: fatal
       MONGO_HOST: mongo
-      POSTGRES_HOST: postgres
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT}
+      AWS_S3_PATH_STYLE: ${AWS_S3_PATH_STYLE}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_BUCKET: ${AWS_BUCKET}
       MOCHA_GREP: ${MOCHA_GREP}
-      LOG_LEVEL: ERROR
-      NODE_ENV: test
     user: node
     depends_on:
-      mongo:
-        condition: service_healthy
+      - mongo
+      - minio
+      - minio_setup
     command: npm run test:acceptance
 
   mongo:
-    image: mongo:3.6
+    image: mongo
+    tmpfs: /data
 
+  minio:
+    image: minio/minio
+    tmpfs: /data
+    command: server /data
+    environment:
+      MINIO_BROWSER: 'off'
+      MINIO_ACCESS_KEY: ${AWS_ACCESS_KEY_ID}
+      MINIO_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+  minio_setup:
+    image: minio/mc
+    entrypoint: sh
+    command:
+      - -c
+      - >
+        sleep 2
+        && mc config host add minio http://minio:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}
+        && mc mb --ignore-existing minio/${AWS_BUCKET}
+    depends_on:
+      - minio
