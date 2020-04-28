@@ -35,7 +35,7 @@ DOCKER_COMPOSE := BUILD_NUMBER=$(BUILD_NUMBER) \
 export DOCKER_REGISTRY ?= local
 export SHARELATEX_DOCKER_REPOS ?= $(DOCKER_REGISTRY)/sharelatex
 
-export IMAGE_NODE ?= $(DOCKER_REGISTRY)/node:12.16.2
+export IMAGE_NODE ?= $(DOCKER_REGISTRY)/node:12.16.3
 export IMAGE_PROJECT ?= $(SHARELATEX_DOCKER_REPOS)/$(PROJECT_NAME)
 export IMAGE_BRANCH ?= $(IMAGE_PROJECT):$(BRANCH_NAME)
 export IMAGE ?= $(IMAGE_BRANCH)-$(BUILD_NUMBER)
@@ -252,7 +252,7 @@ endif
 
 pull_node:
 	docker pull $(IMAGE_NODE)
-	docker tag $(IMAGE_NODE) node:12.16.2
+	docker tag $(IMAGE_NODE) node:12.16.3
 
 pull_cache_cold:
 	docker pull $(IMAGE_CACHE_COLD)$(R_TARGET)
