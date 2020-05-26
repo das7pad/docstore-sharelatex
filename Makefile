@@ -9,6 +9,10 @@ else
 git = sh -c 'false'
 endif
 
+PWD ?= $(shell pwd)
+SUDO_UID ?= $(shell id -u)
+SUDO_GID ?= $(shell id -g)
+
 BUILD_NUMBER ?= local
 BRANCH_NAME ?= $(shell $(git) rev-parse --abbrev-ref HEAD || echo master)
 COMMIT ?= $(shell $(git) rev-parse HEAD || echo HEAD)
@@ -76,7 +80,7 @@ LINT_RUNNER = \
 		--tty \
 		--volume $(PWD):$(PWD) \
 		--workdir $(PWD) \
-		--user $(shell id -u):$(shell id -g) \
+		--user $(SUDO_UID):$(SUDO_GID) \
 		$(LINT_RUNNER_IMAGE)
 
 GIT_PREVIOUS_SUCCESSFUL_COMMIT ?= $(shell \
