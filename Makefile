@@ -13,28 +13,20 @@ PWD ?= $(shell pwd)
 SUDO_UID ?= $(shell id -u)
 SUDO_GID ?= $(shell id -g)
 
-BUILD_NUMBER ?= local
-BRANCH_NAME ?= $(shell $(git) rev-parse --abbrev-ref HEAD || echo master)
-COMMIT ?= $(shell $(git) rev-parse HEAD || echo HEAD)
-RELEASE ?= $(shell $(git) describe --tags || echo v0.0.0 | sed 's/-g/+/;s/^v//')
-PROJECT_NAME = docstore
-BUILD_DIR_NAME = $(shell pwd | xargs basename | tr -cd '[a-zA-Z0-9_.\-]')
-AWS_S3_ENDPOINT ?= http://minio:9000
-AWS_S3_PATH_STYLE ?= true
-AWS_ACCESS_KEY_ID ?= $(shell openssl rand -hex 20)
-AWS_SECRET_ACCESS_KEY ?= $(shell openssl rand -hex 20)
-AWS_BUCKET ?= bucket
+export BUILD_NUMBER ?= local
+export BRANCH_NAME ?= $(shell $(git) rev-parse --abbrev-ref HEAD || echo master)
+export COMMIT ?= $(shell $(git) rev-parse HEAD || echo HEAD)
+export RELEASE ?= \
+	$(shell $(git) describe --tags || echo v0.0.0 | sed 's/-g/+/;s/^v//')
+export PROJECT_NAME = docstore
+export BUILD_DIR_NAME = $(shell pwd | xargs basename | tr -cd '[a-zA-Z0-9_.\-]')
+export AWS_S3_ENDPOINT ?= http://minio:9000
+export AWS_S3_PATH_STYLE ?= true
+export AWS_ACCESS_KEY_ID ?= $(shell openssl rand -hex 20)
+export AWS_SECRET_ACCESS_KEY ?= $(shell openssl rand -hex 20)
+export AWS_BUCKET ?= bucket
 DOCKER_COMPOSE_FLAGS ?= -f docker-compose.yml
-DOCKER_COMPOSE := BUILD_NUMBER=$(BUILD_NUMBER) \
-	BRANCH_NAME=$(BRANCH_NAME) \
-	PROJECT_NAME=$(PROJECT_NAME) \
-	MOCHA_GREP=${MOCHA_GREP} \
-	AWS_S3_ENDPOINT=$(AWS_S3_ENDPOINT) \
-	AWS_S3_PATH_STYLE=$(AWS_S3_PATH_STYLE) \
-	AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
-	AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
-	AWS_BUCKET=$(AWS_BUCKET) \
-	docker-compose ${DOCKER_COMPOSE_FLAGS}
+DOCKER_COMPOSE := docker-compose $(DOCKER_COMPOSE_FLAGS)
 
 export DOCKER_REGISTRY ?= local
 export SHARELATEX_DOCKER_REPOS ?= $(DOCKER_REGISTRY)/sharelatex
