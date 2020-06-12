@@ -28,6 +28,7 @@ find /tmp/ -mindepth 1 -maxdepth 1 -exec rm -rf '{}' +
 
 rm \
     /root/.config \
+    /root/.cache \
     /root/.node-gyp \
     /root/.npm \
     -rf
