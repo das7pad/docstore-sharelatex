@@ -2,4 +2,4 @@ docstore
 --language=es
 --node-version=12.18.2
 --dependencies=mongo,minio
---lint-runner-version=2.0.0
+--lint-runner-version=2.0.1

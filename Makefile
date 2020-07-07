@@ -67,7 +67,7 @@ test: format
 format:
 
 LINT_RUNNER_IMAGE ?= \
-	$(SHARELATEX_DOCKER_REPOS)/lint-runner:2.0.0
+	$(SHARELATEX_DOCKER_REPOS)/lint-runner:2.0.1
 LINT_RUNNER = \
 	docker run \
 		--rm \
