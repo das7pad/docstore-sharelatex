@@ -20,6 +20,18 @@ const HealthChecker = require('./HealthChecker')
 const Settings = require('settings-sharelatex')
 
 module.exports = HttpController = {
+  checkDocExists(req, res, next) {
+    const { project_id, doc_id } = req.params
+    DocManager.checkDocExists(project_id, doc_id, function (error, exists) {
+      if (error) {
+        return next(error)
+      }
+      if (!exists) {
+        return res.status(404).json(false)
+      }
+      res.json(true)
+    })
+  },
   getDoc(req, res, next) {
     if (next == null) {
       next = function (error) {}

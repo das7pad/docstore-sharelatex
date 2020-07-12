@@ -44,6 +44,10 @@ Metrics.injectMetricsRoute(app)
 
 app.get('/project/:project_id/doc', HttpController.getAllDocs)
 app.get('/project/:project_id/ranges', HttpController.getAllRanges)
+app.get(
+  '/project/:project_id/doc/:doc_id/exists',
+  HttpController.checkDocExists
+)
 app.get('/project/:project_id/doc/:doc_id', HttpController.getDoc)
 app.get('/project/:project_id/doc/:doc_id/raw', HttpController.getRawDoc)
 // Add 64kb overhead for the JSON encoding, and double the size to allow for ranges in the json payload
