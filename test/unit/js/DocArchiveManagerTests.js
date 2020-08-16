@@ -150,8 +150,10 @@ describe('DocArchiveManager', function () {
         './Errors': Errors
       },
       globals: {
+        Buffer,
         console,
-        JSON
+        JSON,
+        process
       }
     })
   })
