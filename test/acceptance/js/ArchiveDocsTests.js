@@ -12,7 +12,6 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-process.env.BACKEND = 'gcs'
 const Settings = require('settings-sharelatex')
 const chai = require('chai')
 const { expect } = chai
@@ -21,7 +20,6 @@ const { db, ObjectId } = require('../../../app/js/mongojs')
 const async = require('async')
 const DocstoreApp = require('./helpers/DocstoreApp')
 const DocstoreClient = require('./helpers/DocstoreClient')
-const { Storage } = require('@google-cloud/storage')
 const Persistor = require('../../../app/js/PersistorManager')
 const Streamifier = require('streamifier')
 
@@ -35,12 +33,6 @@ function uploadContent(path, json, callback) {
 describe('Archiving', function () {
   before(function (done) {
     return DocstoreApp.ensureRunning(done)
-  })
-
-  before(async function () {
-    const storage = new Storage(Settings.docstore.gcs.endpoint)
-    await storage.createBucket(Settings.docstore.bucket)
-    await storage.createBucket(`${Settings.docstore.bucket}-deleted`)
   })
 
   describe('multiple docs in a project', function () {
