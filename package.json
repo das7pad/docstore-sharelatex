@@ -19,7 +19,7 @@
     "format:fix": "node_modules/.bin/prettier-eslint $PWD/'**/*.js' --write"
   },
   "dependencies": {
-    "@overleaf/object-persistor": "https://github.com/das7pad/object-persistor/archive/2e43bcb0be4bac9d80bf87ff2c6f359eb4a1dd64.tar.gz",
+    "@overleaf/object-persistor": "https://github.com/das7pad/object-persistor/archive/3b8ad24fc965443ad7c240e97f2a3178cb033a19.tar.gz",
     "async": "^2.6.3",
     "aws-sdk": "^2.734.0",
     "body-parser": "^1.19.0",
