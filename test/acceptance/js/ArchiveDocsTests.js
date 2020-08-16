@@ -12,16 +12,35 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
+process.env.BACKEND = 'gcs'
+const Settings = require('settings-sharelatex')
 const chai = require('chai')
+const { expect } = chai
 const should = chai.should()
-const { db, ObjectId, ISODate } = require('../../../app/js/mongojs')
+const { db, ObjectId } = require('../../../app/js/mongojs')
 const async = require('async')
 const DocstoreApp = require('./helpers/DocstoreApp')
 const DocstoreClient = require('./helpers/DocstoreClient')
+const { Storage } = require('@google-cloud/storage')
+const Persistor = require('../../../app/js/PersistorManager')
+const Streamifier = require('streamifier')
+
+function uploadContent(path, json, callback) {
+  const stream = Streamifier.createReadStream(JSON.stringify(json))
+  Persistor.sendStream(Settings.docstore.bucket, path, stream)
+    .then(() => callback())
+    .catch(callback)
+}
 
 describe('Archiving', function () {
   before(function (done) {
     return DocstoreApp.ensureRunning(done)
+  })
+
+  before(async function () {
+    const storage = new Storage(Settings.docstore.gcs.endpoint)
+    await storage.createBucket(Settings.docstore.bucket)
+    await storage.createBucket(`${Settings.docstore.bucket}-deleted`)
   })
 
   describe('multiple docs in a project', function () {
@@ -95,10 +114,10 @@ describe('Archiving', function () {
             return DocstoreClient.getS3Doc(
               this.project_id,
               doc._id,
-              (error, res, s3_doc) => {
+              (error, s3_doc) => {
                 s3_doc.lines.should.deep.equal(doc.lines)
                 s3_doc.ranges.should.deep.equal(doc.ranges)
-                return callback()
+                callback()
               }
             )
           }
@@ -211,7 +230,7 @@ describe('Archiving', function () {
       return DocstoreClient.getS3Doc(
         this.project_id,
         this.doc._id,
-        (error, res, s3_doc) => {
+        (error, s3_doc) => {
           if (error != null) {
             throw error
           }
@@ -312,7 +331,7 @@ describe('Archiving', function () {
       return DocstoreClient.getS3Doc(
         this.project_id,
         this.doc._id,
-        (error, res, s3_doc) => {
+        (error, s3_doc) => {
           if (error != null) {
             throw error
           }
@@ -786,7 +805,7 @@ describe('Archiving', function () {
       return DocstoreClient.getS3Doc(
         this.project_id,
         this.doc._id,
-        (error, res, s3_doc) => {
+        (error, s3_doc) => {
           if (error != null) {
             throw error
           }
@@ -905,7 +924,7 @@ describe('Archiving', function () {
       return DocstoreClient.getS3Doc(
         this.project_id,
         this.doc._id,
-        (error, res, s3_doc) => {
+        (error, s3_doc) => {
           if (error != null) {
             throw error
           }
@@ -1002,7 +1021,7 @@ describe('Archiving', function () {
       return DocstoreClient.getS3Doc(
         this.project_id,
         this.doc._id,
-        (error, res, s3_doc) => {
+        (error, s3_doc) => {
           if (error != null) {
             throw error
           }
@@ -1050,35 +1069,36 @@ describe('Archiving', function () {
         ranges: {},
         version: 2
       }
-      const key = `${this.project_id}/${this.doc._id}`
-      DocstoreClient.putS3DocOld(key, this.doc.lines, (error) => {
-        if (error != null) {
-          throw error
-        }
-        return db.docs.insert(
-          {
-            project_id: this.project_id,
-            _id: this.doc._id,
-            rev: this.doc.version,
-            inS3: true
-          },
-          (error) => {
-            if (error != null) {
-              throw error
-            }
-            return DocstoreClient.getAllDocs(
-              this.project_id,
-              (error, res, fetched_docs) => {
-                this.fetched_docs = fetched_docs
-                if (error != null) {
-                  throw error
-                }
-                return done()
+      uploadContent(
+        `${this.project_id}/${this.doc._id}`,
+        this.doc.lines,
+        (error) => {
+          expect(error).not.to.exist
+          db.docs.insert(
+            {
+              project_id: this.project_id,
+              _id: this.doc._id,
+              rev: this.doc.version,
+              inS3: true
+            },
+            (error) => {
+              if (error != null) {
+                throw error
               }
-            )
-          }
-        )
-      })
+              DocstoreClient.getAllDocs(
+                this.project_id,
+                (error, res, fetched_docs) => {
+                  this.fetched_docs = fetched_docs
+                  if (error != null) {
+                    throw error
+                  }
+                  return done()
+                }
+              )
+            }
+          )
+        }
+      )
     })
 
     it('should restore the doc to mongo', function (done) {

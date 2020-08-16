@@ -16,6 +16,7 @@ chai.should()
 const { db, ObjectId } = require('../../../app/js/mongojs')
 const { expect } = chai
 const DocstoreApp = require('./helpers/DocstoreApp')
+const Errors = require('../../../app/js/Errors')
 
 const DocstoreClient = require('./helpers/DocstoreClient')
 
@@ -137,9 +138,8 @@ describe('Deleting a doc', function () {
           this.project_id,
           this.doc_id,
           (error) => {
-            if (!error || error.code !== 'NoSuchKey')
-              return done(new Error('doc exists'))
-            return done()
+            expect(error).to.be.instanceOf(Errors.NotFoundError)
+            done()
           }
         )
       })

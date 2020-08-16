@@ -14,15 +14,22 @@
 let DocstoreClient
 const request = require('request').defaults({ jar: false })
 const settings = require('settings-sharelatex')
+const Persistor = require('../../../../app/js/PersistorManager')
 
-const AWS = require('aws-sdk')
-const s3 = new AWS.S3({
-  accessKeyId: settings.docstore.s3.key,
-  secretAccessKey: settings.docstore.s3.secret,
-  endpoint: settings.docstore.s3.endpoint,
-  s3ForcePathStyle: settings.docstore.s3.forcePathStyle,
-  signatureVersion: 'v4'
-})
+async function streamToString(stream) {
+  const chunks = []
+  return new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => chunks.push(chunk))
+    stream.on('error', reject)
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+  })
+}
+
+async function getStringFromPersistor(persistor, bucket, key) {
+  const stream = await persistor.getObjectStream(bucket, key, {})
+  stream.resume()
+  return streamToString(stream)
+}
 
 module.exports = DocstoreClient = {
   createDoc(project_id, doc_id, lines, version, ranges, callback) {
@@ -62,7 +69,9 @@ module.exports = DocstoreClient = {
         url: `http://localhost:${settings.internal.docstore.port}/project/${project_id}/doc`,
         json: true
       },
-      callback
+      (req, res, body) => {
+        callback(req, res, body)
+      }
     )
   },
 
@@ -133,30 +142,14 @@ module.exports = DocstoreClient = {
   },
 
   getS3Doc(project_id, doc_id, callback) {
-    if (callback == null) {
-      callback = function (error, res, body) {}
-    }
-    const options = {
-      Bucket: settings.docstore.s3.bucket,
-      Key: project_id + '/' + doc_id
-    }
-    s3.getObject(options, (err, response) => {
-      if (err) {
-        return callback(err)
-      }
-      return callback(err, response, JSON.parse(response.Body.toString()))
-    })
-  },
-
-  putS3DocOld: function (key, lines, callback) {
-    if (callback == null) {
-      callback = function (error, res) {}
-    }
-    const options = {
-      Bucket: settings.docstore.s3.bucket,
-      Key: key,
-      Body: JSON.stringify(lines)
-    }
-    s3.putObject(options, callback)
+    getStringFromPersistor(
+      Persistor,
+      settings.docstore.bucket,
+      `${project_id}/${doc_id}`
+    )
+      .then((data) => {
+        callback(null, JSON.parse(data))
+      })
+      .catch(callback)
   }
 }

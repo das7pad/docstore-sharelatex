@@ -14,11 +14,12 @@
     "test:unit:_run": "mocha --recursive --reporter spec $@ test/unit/js",
     "test:unit": "npm run test:unit:_run -- --grep=$MOCHA_GREP",
     "nodemon": "nodemon --config nodemon.json",
-    "lint": "node_modules/.bin/eslint .",
+    "lint": "node_modules/.bin/eslint --max-warnings 0 .",
     "format": "node_modules/.bin/prettier-eslint $PWD/'**/*.js' --list-different",
     "format:fix": "node_modules/.bin/prettier-eslint $PWD/'**/*.js' --write"
   },
   "dependencies": {
+    "@overleaf/object-persistor": "git+https://github.com/overleaf/object-persistor.git",
     "async": "^2.6.3",
     "aws-sdk": "^2.658.0",
     "body-parser": "^1.19.0",
@@ -28,6 +29,8 @@
     "mongojs": "git+https://github.com/das7pad/mongojs.git#e39e97bf289435e2d111c6201d3306b6b776d31e",
     "request": "~2.88.2",
     "settings-sharelatex": "git+https://github.com/das7pad/settings-sharelatex.git#d0797834438df2d102798a64602adf2f71ac8e48",
+    "streamifier": "^0.1.1",
+    "tiny-async-pool": "^1.1.0",
     "underscore": "~1.9.2"
   },
   "devDependencies": {
