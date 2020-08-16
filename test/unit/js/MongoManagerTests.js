@@ -27,7 +27,7 @@ describe('MongoManager', function () {
           db: (this.db = { docs: {}, docOps: {} }),
           ObjectId
         },
-        'metrics-sharelatex': { timeAsyncMethod: sinon.stub() },
+        '@overleaf/metrics': { timeAsyncMethod: sinon.stub() },
         'logger-sharelatex': { log() {} }
       },
       globals: {
